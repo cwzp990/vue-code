@@ -1,1 +1,117 @@
 # 第一章 认识flow #
+
+flow是facebook 出品的 JavaScript 静态类型检查工具
+
+flow有两种工作方式：
+
+- **类型推断**：通过变量的使用上下文来推断出变量类型，然后根据这些推断来检查类型
+- **类型注释**：事先注释好我们期待的类型，Flow 会基于这些注释来判断
+
+## 类型判断 ##
+
+```
+
+/*@flow*/\``
+
+function split(str) {
+
+  return str.split(' ')
+}
+
+split(11)
+
+```
+
+上面代码会报错，split期待的参数是字符串，而我们输入了数字
+
+## 类型注释 ##
+
+```
+
+/*@flow*/
+
+function add(x, y){
+
+  return x + y
+}
+
+add('Hello', 11)
+
+```
+
+上面的代码就检查不出任何错误，因为在语法层面上，+可以用作字符串也可以用作数字上，所以我们需要借助类型注释来指明期望的类型：
+
+```
+
+/*@flow*/
+
+function add(x: number, y: number): number {
+
+  return x + y
+}
+
+add('Hello', 11)
+
+```
+
+上面的代码就会报错，函数期望的类型是数字，而我们传入了字符串。这是针对函数类型的注释。
+
+```
+
+/*@flow*/
+
+var arr: Array<number> = [1, 2, 3]
+
+arr.push('Hello')
+
+```
+
+上面的代码依旧会报错，期望的是数字，而我们传入了字符串。
+
+```
+
+/*@flow*/
+
+class Bar {
+
+  x: string;           // x 是字符串
+
+  y: string | number;  // y 可以是字符串或者数字
+
+  z: boolean;
+
+  constructor(x: string, y: string | number) {
+
+    this.x = x
+    this.y = y
+    this.z = false
+  }
+}
+
+var bar: Bar = new Bar('hello', 4)
+
+var obj: { a: string, b: number, c: Array<string>, d: Bar } = {
+
+  a: 'hello',
+
+  b: 11,
+
+  c: ['hello', 'world'],
+
+  d: new Bar('hello', 3)
+
+}
+
+```
+
+若想任意类型T可以为null或者undefined，只需要：
+
+```
+
+/*@flow*/
+
+var foo: ?string = null
+
+```
+
+上面的代码表明，foo可以为字符串，也可以为null
