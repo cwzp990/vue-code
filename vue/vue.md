@@ -115,3 +115,9 @@ var foo: ?string = null
 ```
 
 上面的代码表明，foo可以为字符串，也可以为null
+
+## flow的安装 ##
+
+使用npm install -g flow-bin
+
+flow init 命令创建配置文件.flowconfig
