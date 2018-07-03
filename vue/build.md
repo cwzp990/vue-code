@@ -1,0 +1,136 @@
+# 第二章 源码构建部分 #
+
+我们在运行npm run build命令进行打包的时候，实际上是执行了package.json里面script的脚本命令。我们可以发现script里面的命令有很多，而跟我们今天构建相关的有三个：
+
+```
+
+    "build": "node scripts/build.js",
+
+    "build:ssr": "npm run build -- web-runtime-cjs,web-server-renderer",
+
+    "build:weex": "npm run build -- weex",
+    
+```
+
+详情可以查看阮一峰的这篇文章http://www.ruanyifeng.com/blog/2016/10/npm_scripts.html
+
+后面两行可以看作是对第一行的补充，也就是添加了环境变量，ssr是在web-server-renderer环境下，weex是在weex环境下
+
+我们对应找到相关文件：
+
+```
+
+let builds = require('./config').getAllBuilds()
+
+// filter builds via command line arg
+if (process.argv[2]) {
+  const filters = process.argv[2].split(',')
+  builds = builds.filter(b => {
+    return filters.some(f => b.output.file.indexOf(f) > -1 || b._name.indexOf(f) > -1)
+  })
+} else {
+  // filter out weex builds by default
+  builds = builds.filter(b => {
+    return b.output.file.indexOf('weex') === -1
+  })
+}
+
+build(builds)
+
+```
+
+上述代码在script/build中，意思是先加载config文件里面的配置，再通过命令行参数对配置做过滤，我们先看一下配置文件
+
+```
+
+const aliases = require('./alias')
+
+const resolve = p => {
+
+  const base = p.split('/')[0]                                      //  截取出下面entry里的web
+
+  if (aliases[base]) {                                              //  如果没有找到走else逻辑，这里是dist
+
+    return path.resolve(aliases[base], p.slice(base.length + 1))    //  截取出下面enter里的entry-runtime.js
+
+  } else {
+
+    return path.resolve(__dirname, '../', p)                        //  这里直接找到dist目录下的文件
+
+  }
+
+}
+
+// 截取了一部分
+
+'web-runtime-cjs': {
+
+  entry: resolve('web/entry-runtime.js'),                           //  执行上面的resolve逻辑
+
+  dest: resolve('dist/vue.runtime.common.js'),
+
+  format: 'cjs',                                                    //  构建的格式，这里遵循commonjs规范
+
+  banner                                                            //  这是头部模板信息
+
+},
+
+```
+
+```
+
+function build (builds) {
+  let built = 0
+  const total = builds.length
+  const next = () => {
+    buildEntry(builds[built]).then(() => {
+      built++
+      if (built < total) {
+        next()
+      }
+    }).catch(logError)
+  }
+
+  next()
+}
+
+function buildEntry (config) {
+  const output = config.output
+  const { file, banner } = output
+  const isProd = /min\.js$/.test(file)
+  return rollup.rollup(config)
+    .then(bundle => bundle.generate(output))
+    .then(({ code }) => {
+      if (isProd) {
+        var minified = (banner ? banner + '\n' : '') + uglify.minify(code, {
+          output: {
+            ascii_only: true
+          },
+          compress: {
+            pure_funcs: ['makeMap']
+          }
+        }).code
+        return write(file, minified, true)
+      } else {
+        return write(file, code)
+      }
+    })
+}
+
+```
+
+这里是将webpack的配置转换成rollup配置
+
+在经过rollup构建打包以后，最终会在dist目录下生成vue.runtime.common.js
+
+## Runtime Only VS Runtime+Compiler ##
+
+我们知道，当我们在用vue-cli新建项目的时候，会让我们选择这两个模式，那这两个模式有何区别呢？
+
+Runtime Only：
+
+在这个模式下，我们需要借助webpack的vue-loader工具把component里面的.vue文件编译成js代码，这个阶段是在编译阶段完成的
+
+Runtime+Compiler：
+
+在这个模式下，vue在运行时会进行编译，最终编译成render函数，这个会对性能造成一定的损耗
